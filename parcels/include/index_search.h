@@ -406,11 +406,11 @@ static inline StatusCode search_indices_curvilinear(type_coord x, type_coord y, 
     reconnect_bnd_indices(xi, yi, xdim, ydim, 0, sphere_mesh);
     it++;
     if ( it > maxIterSearch){
-      printf("Correct cell not found for (%f, %f) after %d iterations\n", x, y, maxIterSearch);
-      printf("Debug info: old particle indices: (yi, xi) %d %d\n", yi_old, xi_old);
-      printf("            new particle indices: (yi, xi) %d %d\n", *yi, *xi);
-      printf("            Mesh 2d shape:  %d %d\n", ydim, xdim);
-      printf("            Relative particle position:  (xsi, eta) %1.16e %1.16e\n", *xsi, *eta);
+    //   printf("Correct cell not found for (%f, %f) after %d iterations\n", x, y, maxIterSearch);
+    //   printf("Debug info: old particle indices: (yi, xi) %d %d\n", yi_old, xi_old);
+    //   printf("            new particle indices: (yi, xi) %d %d\n", *yi, *xi);
+    //   printf("            Mesh 2d shape:  %d %d\n", ydim, xdim);
+    //   printf("            Relative particle position:  (xsi, eta) %1.16e %1.16e\n", *xsi, *eta);
       return ERROR_OUT_OF_BOUNDS;
     }
   }
