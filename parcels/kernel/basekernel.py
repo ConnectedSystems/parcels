@@ -360,8 +360,9 @@ class BaseKernel:
                 g.cstruct = None  # This force to point newly the grids from Python to C
             # Make a copy of the transposed array to enforce
             # C-contiguous memory layout for JIT mode.
+            fois = (VectorField, NestedField, SummedField)
             for f in pset.fieldset.get_fields():
-                if type(f) in [VectorField, NestedField, SummedField]:
+                if type(f) in fois:
                     continue
                 if f.data.dtype != np.float32:
                     raise RuntimeError(f'Field {f.name} data needs to be float32 in JIT mode')
@@ -425,7 +426,8 @@ class BaseKernel:
                 p.set_state(StateCode.Success)
             return p
 
-        while p.state in [StateCode.Evaluate, OperationCode.Repeat] or np.isclose(dt, 0):
+        code_oi = (StateCode.Evaluate, OperationCode.Repeat)
+        while p.state in code_oi or np.isclose(dt, 0):
             for var in variables:
                 p_var_back[var.name] = getattr(p, var.name)
             try:
@@ -484,8 +486,9 @@ class BaseKernel:
             else:
                 p.set_state(res)
                 # Try again without time update
+                var_oi = ['dt', 'state']
                 for var in variables:
-                    if var.name not in ['dt', 'state']:
+                    if var.name not in var_oi:
                         setattr(p, var.name, p_var_back[var.name])
                 if abs(endtime - p.time) < abs(p.dt):
                     dt_pos = abs(endtime - p.time)
