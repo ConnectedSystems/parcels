@@ -181,8 +181,9 @@ class KernelSOA(BaseKernel):
             dt = np.inf
 
         if self.fieldset is not None:
+            foi = [VectorField, NestedField, SummedField]
             for f in self.fieldset.get_fields():
-                if type(f) in [VectorField, NestedField, SummedField]:
+                if type(f) in foi:
                     continue
                 f.data = np.array(f.data)
 
