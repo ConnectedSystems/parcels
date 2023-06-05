@@ -248,7 +248,8 @@ static inline StatusCode search_indices_rectilinear(type_coord x, type_coord y, 
     if (xvalsi1 < xvalsi - 180) xvalsi1 += 360;
     if (xvalsi1 > xvalsi + 180) xvalsi1 -= 360;
 
-    int itMax = 10000;
+    // int itMax = 10000;
+    int itMax = 10;
     int it = 0;
     while ( (xvalsi > x) || (xvalsi1 < x) ){
       if (xvalsi1 < x)
@@ -350,7 +351,8 @@ static inline StatusCode search_indices_curvilinear(type_coord x, type_coord y, 
   double a[4], b[4];
 
   *xsi = *eta = -1;
-  int maxIterSearch = 1e6, it = 0;
+  // int maxIterSearch = 1e6, it = 0;
+  int maxIterSearch = 100, it = 0;
   double tol = 1e-10;
   while ( (*xsi < -tol) || (*xsi > 1+tol) || (*eta < -tol) || (*eta > 1+tol) ){
     double xgrid_loc[4] = {xgrid[*yi][*xi], xgrid[*yi][*xi+1], xgrid[*yi+1][*xi+1], xgrid[*yi+1][*xi]};
