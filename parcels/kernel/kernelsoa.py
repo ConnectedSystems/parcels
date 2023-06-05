@@ -22,7 +22,10 @@ from parcels.tools.loggers import logger
 from parcels.tools.statuscodes import ErrorCode, OperationCode, StateCode
 from parcels.tools.statuscodes import recovery_map as recovery_base_map
 
-__all__ = ['KernelSOA']
+# Cythonized loop runs into data issues so ignore for now.
+# from parcels.kernel.retryparticles import retry_particles
+
+__all__ = ["KernelSOA"]
 
 
 class KernelSOA(BaseKernel):
@@ -45,16 +48,36 @@ class KernelSOA(BaseKernel):
     concatenation, the merged AST plus the new header definition is required.
     """
 
-    def __init__(self, fieldset, ptype, pyfunc=None, funcname=None,
-                 funccode=None, py_ast=None, funcvars=None, c_include="", delete_cfiles=True):
-        super().__init__(fieldset=fieldset, ptype=ptype, pyfunc=pyfunc, funcname=funcname, funccode=funccode, py_ast=py_ast, funcvars=funcvars, c_include=c_include, delete_cfiles=delete_cfiles)
+    def __init__(
+        self,
+        fieldset,
+        ptype,
+        pyfunc=None,
+        funcname=None,
+        funccode=None,
+        py_ast=None,
+        funcvars=None,
+        c_include="",
+        delete_cfiles=True,
+    ):
+        super().__init__(
+            fieldset=fieldset,
+            ptype=ptype,
+            pyfunc=pyfunc,
+            funcname=funcname,
+            funccode=funccode,
+            py_ast=py_ast,
+            funcvars=funcvars,
+            c_include=c_include,
+            delete_cfiles=delete_cfiles,
+        )
 
         # Derive meta information from pyfunc, if not given
         self.check_fieldsets_in_kernels(pyfunc)
 
         if funcvars is not None:
             self.funcvars = funcvars
-        elif hasattr(pyfunc, '__code__'):
+        elif hasattr(pyfunc, "__code__"):
             self.funcvars = list(pyfunc.__code__.co_varnames)
         else:
             self.funcvars = None
@@ -66,12 +89,12 @@ class KernelSOA(BaseKernel):
             stack = inspect.stack()
             try:
                 user_ctx = stack[-1][0].f_globals
-                user_ctx['math'] = globals()['math']
-                user_ctx['ParcelsRandom'] = globals()['ParcelsRandom']
-                user_ctx['random'] = globals()['random']
-                user_ctx['StateCode'] = globals()['StateCode']
-                user_ctx['OperationCode'] = globals()['OperationCode']
-                user_ctx['ErrorCode'] = globals()['ErrorCode']
+                user_ctx["math"] = globals()["math"]
+                user_ctx["ParcelsRandom"] = globals()["ParcelsRandom"]
+                user_ctx["random"] = globals()["random"]
+                user_ctx["StateCode"] = globals()["StateCode"]
+                user_ctx["OperationCode"] = globals()["OperationCode"]
+                user_ctx["ErrorCode"] = globals()["ErrorCode"]
             except:
                 logger.warning("Could not access user context when merging kernels")
                 user_ctx = globals()
@@ -87,24 +110,26 @@ class KernelSOA(BaseKernel):
 
         numkernelargs = self.check_kernel_signature_on_version()
 
-        assert numkernelargs == 3, \
-            'Since Parcels v2.0, kernels do only take 3 arguments: particle, fieldset, time !! AND !! Argument order in field interpolation is time, depth, lat, lon.'
+        assert (
+            numkernelargs == 3
+        ), "Since Parcels v2.0, kernels do only take 3 arguments: particle, fieldset, time !! AND !! Argument order in field interpolation is time, depth, lat, lon."
 
         self.name = f"{ptype.name}{self.funcname}"
 
         # Generate the kernel function and add the outer loop
         if self.ptype.uses_jit:
             kernelgen = KernelGenerator(fieldset, ptype)
-            kernel_ccode = kernelgen.generate(deepcopy(self.py_ast),
-                                              self.funcvars)
+            kernel_ccode = kernelgen.generate(deepcopy(self.py_ast), self.funcvars)
             self.field_args = kernelgen.field_args
             self.vector_field_args = kernelgen.vector_field_args
             fieldset = self.fieldset
             for f in self.vector_field_args.values():
-                Wname = f.W.ccode_name if f.W else 'not_defined'
-                for sF_name, sF_component in zip([f.U.ccode_name, f.V.ccode_name, Wname], ['U', 'V', 'W']):
+                Wname = f.W.ccode_name if f.W else "not_defined"
+                for sF_name, sF_component in zip(
+                    [f.U.ccode_name, f.V.ccode_name, Wname], ["U", "V", "W"]
+                ):
                     if sF_name not in self.field_args:
-                        if sF_name != 'not_defined':
+                        if sF_name != "not_defined":
                             self.field_args[sF_name] = getattr(f, sF_component)
             self.const_args = kernelgen.const_args
             loopgen = LoopGenerator(fieldset, ptype)
@@ -113,10 +138,19 @@ class KernelSOA(BaseKernel):
                     c_include_str = f.read()
             else:
                 c_include_str = self._c_include
-            self.ccode = loopgen.generate(self.funcname, self.field_args, self.const_args,
-                                          kernel_ccode, c_include_str)
+            self.ccode = loopgen.generate(
+                self.funcname,
+                self.field_args,
+                self.const_args,
+                kernel_ccode,
+                c_include_str,
+            )
 
-            src_file_or_files, self.lib_file, self.log_file = self.get_kernel_compile_files()
+            (
+                src_file_or_files,
+                self.lib_file,
+                self.log_file,
+            ) = self.get_kernel_compile_files()
             if type(src_file_or_files) in (list, dict, tuple, np.ndarray):
                 self.dyn_srcs = src_file_or_files
             else:
@@ -125,12 +159,12 @@ class KernelSOA(BaseKernel):
     def execute_jit(self, pset, endtime, dt):
         """Invokes JIT engine to perform the core update loop."""
         self.load_fieldset_jit(pset)
-
         fargs = [byref(f.ctypes_struct) for f in self.field_args.values()]
         fargs += [c_double(f) for f in self.const_args.values()]
         particle_data = byref(pset.ctypes_struct)
-        return self._function(c_int(len(pset)), particle_data,
-                              c_double(endtime), c_double(dt), *fargs)
+        return self._function(
+            c_int(len(pset)), particle_data, c_double(endtime), c_double(dt), *fargs
+        )
 
     def execute_python(self, pset, endtime, dt):
         """Performs the core update loop via Python."""
@@ -138,10 +172,12 @@ class KernelSOA(BaseKernel):
         sign_dt = np.sign(dt)
 
         analytical = False
-        if 'AdvectionAnalytical' in self._pyfunc.__name__:
+        if "AdvectionAnalytical" in self._pyfunc.__name__:
             analytical = True
             if not np.isinf(dt):
-                logger.warning_once('dt is not used in AnalyticalAdvection, so is set to np.inf')
+                logger.warning_once(
+                    "dt is not used in AnalyticalAdvection, so is set to np.inf"
+                )
             dt = np.inf
 
         if self.fieldset is not None:
@@ -165,25 +201,39 @@ class KernelSOA(BaseKernel):
             output_file.write(pset, endtime, deleted_only=bool_indices)
         pset.remove_indices(indices)
 
-    def execute(self, pset, endtime, dt, recovery=None, output_file=None, execute_once=False):
+    def execute(
+        self, pset, endtime, dt, recovery=None, output_file=None, execute_once=False
+    ):
         """Execute this Kernel over a ParticleSet for several timesteps."""
         pset.collection.state[:] = StateCode.Evaluate
 
         if abs(dt) < 1e-6 and not execute_once:
-            logger.warning_once("'dt' is too small, causing numerical accuracy limit problems. Please chose a higher 'dt' and rather scale the 'time' axis of the field accordingly. (related issue #762)")
+            logger.warning_once(
+                "'dt' is too small, causing numerical accuracy limit problems. Please chose a higher 'dt' and rather scale the 'time' axis of the field accordingly. (related issue #762)"
+            )
 
         if recovery is None:
             recovery = {}
-        elif ErrorCode.ErrorOutOfBounds in recovery and ErrorCode.ErrorThroughSurface not in recovery:
-            recovery[ErrorCode.ErrorThroughSurface] = recovery[ErrorCode.ErrorOutOfBounds]
+        elif (
+            ErrorCode.ErrorOutOfBounds in recovery
+            and ErrorCode.ErrorThroughSurface not in recovery
+        ):
+            recovery[ErrorCode.ErrorThroughSurface] = recovery[
+                ErrorCode.ErrorOutOfBounds
+            ]
         recovery_map = recovery_base_map.copy()
         recovery_map.update(recovery)
 
         if pset.fieldset is not None:
             for g in pset.fieldset.gridset.grids:
-                if len(g.load_chunk) > g.chunk_not_loaded:  # not the case if a field in not called in the kernel
-                    g.load_chunk = np.where(g.load_chunk == g.chunk_loaded_touched,
-                                            g.chunk_deprecated, g.load_chunk)
+                if (
+                    len(g.load_chunk) > g.chunk_not_loaded
+                ):  # not the case if a field in not called in the kernel
+                    g.load_chunk = np.where(
+                        g.load_chunk == g.chunk_loaded_touched,
+                        g.chunk_deprecated,
+                        g.load_chunk,
+                    )
 
         # Execute the kernel over the particle set
         if self.ptype.uses_jit:
@@ -192,11 +242,15 @@ class KernelSOA(BaseKernel):
             self.execute_python(pset, endtime, dt)
 
         # Remove all particles that signalled deletion
-        self.remove_deleted(pset, output_file=output_file, endtime=endtime)   # Generalizable version!
+        self.remove_deleted(
+            pset, output_file=output_file, endtime=endtime
+        )  # Generalizable version!
+
+        # Cythonized version runs into data type issues, so don't use for now.
+        # retry_particles(self, pset, output_file, endtime, dt)
 
         # Identify particles that threw errors
         n_error = pset.num_error_particles
-
         while n_error > 0:
             error_pset = pset.error_particles
             # Apply recovery kernel
@@ -214,11 +268,15 @@ class KernelSOA(BaseKernel):
                     if p.isComputed():
                         p.reset_state()
                 else:
-                    logger.warning_once(f'Deleting particle {p.id} because of non-recoverable error')
+                    logger.warning_once(
+                        f"Deleting particle {p.id} because of non-recoverable error"
+                    )
                     p.delete()
 
             # Remove all particles that signalled deletion
-            self.remove_deleted(pset, output_file=output_file, endtime=endtime)   # Generalizable version!
+            self.remove_deleted(
+                pset, output_file=output_file, endtime=endtime
+            )  # Generalizable version!
 
             # Execute core loop again to continue interrupted particles
             if self.ptype.uses_jit:
